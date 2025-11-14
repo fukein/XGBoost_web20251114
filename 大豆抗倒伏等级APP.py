@@ -139,7 +139,7 @@ st.markdown("请输入大豆的相关特征参数，系统将预测其倒伏级�
 
 # 特征输入模块（2列布局）
 with st.container():
-    st.markdown('<div class="card"><h3 class="section-title">作物特征参数</h3>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><h3 class="section-title">大豆特征参数</h3>', unsafe_allow_html=True)
     cols = st.columns(2)
     feature_values = {}
     feature_names = list(feature_ranges.keys())
@@ -344,4 +344,5 @@ if "pred_results" in st.session_state:
             shap_df["绝对贡献度 (Absolute Contribution)"] = shap_df["SHAP值 (贡献度)"].abs()
             shap_df_sorted = shap_df.sort_values("绝对贡献度 (Absolute Contribution)", ascending=False).drop("绝对贡献度 (Absolute Contribution)", axis=1)
             st.dataframe(shap_df_sorted, use_container_width=True)
+
 
