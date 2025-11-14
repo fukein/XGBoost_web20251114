@@ -1008,6 +1008,20 @@ def init_db():
     conn.commit()
     conn.close()
 
+def reset_admin_password():
+    """强制重置管理员密码为admin123（用于修复登录问题）"""
+    conn = sqlite3.connect('user_db.db')
+    c = conn.cursor()
+    admin_pwd = encrypt_password("admin123")  # 强制设置为初始密码
+    # 无论admin是否存在，都更新/插入管理员账号
+    c.execute('''INSERT OR REPLACE INTO users 
+                 (username, password, role, create_time) 
+                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)''', 
+              ("admin", admin_pwd, "admin"))
+    conn.commit()
+    conn.close()
+    print("管理员账号已重置，用户名：admin，密码：admin123")
+
 def encrypt_password(password):
     """密码加密（SHA-256 + 盐值）"""
     salt = "soybean_lodging_system_salt_2024"
@@ -1477,6 +1491,8 @@ def main_app():
 # ---------------------- 9. 程序入口 ----------------------
 if __name__ == "__main__":
     init_session_state()
+    # 临时添加：重置管理员账号（修复后删除此行）
+    reset_admin_password()
     
     # 根据页面状态显示内容
     if st.session_state.current_page == "login":
@@ -1491,4 +1507,5 @@ if __name__ == "__main__":
         # 非法访问跳转登录
         go_to_login()
         st.rerun()
+
 
