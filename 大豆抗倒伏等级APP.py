@@ -973,23 +973,38 @@ matplotlib.rcParams['axes.unicode_minus'] = False
 
 # ---------------------- 2. 数据库操作（用户管理+权限控制） ----------------------
 def init_db():
-    """初始化数据库，增加权限字段（admin/user）"""
+    """初始化数据库，兼容已有表结构，避免冲突"""
     conn = sqlite3.connect('user_db.db')
     c = conn.cursor()
-    # 创建用户表：用户名、加密密码、权限(admin/user)、注册时间
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (username TEXT PRIMARY KEY NOT NULL,
-                  password TEXT NOT NULL,
-                  role TEXT NOT NULL DEFAULT 'user',  -- 权限：admin或user
-                  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # 初始化管理员账号（首次运行自动创建，可手动修改密码）
-    admin_pwd = encrypt_password("admin123")  # 初始管理员密码
-    try:
+    # 1. 检查并创建用户表（如果不存在），使用更兼容的方式
+    # 先检查表是否存在
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+    table_exists = c.fetchone() is not None
+    
+    if not table_exists:
+        # 表不存在时创建，包含role字段
+        c.execute('''CREATE TABLE users
+                     (username TEXT PRIMARY KEY NOT NULL,
+                      password TEXT NOT NULL,
+                      role TEXT NOT NULL DEFAULT 'user',
+                      create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    else:
+        # 表已存在时，检查是否有role字段（兼容旧表结构）
+        c.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in c.fetchall()]
+        if 'role' not in columns:
+            # 旧表没有role字段，添加该字段
+            c.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
+    
+    # 2. 安全插入管理员账号（仅当admin不存在时）
+    c.execute("SELECT username FROM users WHERE username = 'admin'")
+    admin_exists = c.fetchone() is not None
+    if not admin_exists:
+        admin_pwd = encrypt_password("admin123")  # 初始管理员密码
         c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", 
                  ("admin", admin_pwd, "admin"))
-    except sqlite3.IntegrityError:
-        pass  # 管理员已存在则跳过
+    
     conn.commit()
     conn.close()
 
@@ -1476,3 +1491,4 @@ if __name__ == "__main__":
         # 非法访问跳转登录
         go_to_login()
         st.rerun()
+
