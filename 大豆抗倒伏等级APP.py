@@ -134,8 +134,8 @@ lodging_levels = {
 
 
 # ---------------------- 4. 页面结构 ----------------------
-st.title("作物倒伏级别预测系统", anchor=False)
-st.markdown("请输入作物的相关特征参数，系统将预测其倒伏级别并展示特征贡献度。")
+st.title("大豆倒伏级别预测系统", anchor=False)
+st.markdown("请输入大豆的相关特征参数，系统将预测其倒伏级别并展示特征贡献度。")
 
 # 特征输入模块（2列布局）
 with st.container():
@@ -344,3 +344,4 @@ if "pred_results" in st.session_state:
             shap_df["绝对贡献度 (Absolute Contribution)"] = shap_df["SHAP值 (贡献度)"].abs()
             shap_df_sorted = shap_df.sort_values("绝对贡献度 (Absolute Contribution)", ascending=False).drop("绝对贡献度 (Absolute Contribution)", axis=1)
             st.dataframe(shap_df_sorted, use_container_width=True)
+
