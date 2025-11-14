@@ -1492,7 +1492,7 @@ def main_app():
 if __name__ == "__main__":
     init_session_state()
     # 临时添加：重置管理员账号（修复后删除此行）
-    reset_admin_password()
+    # reset_admin_password()
     
     # 根据页面状态显示内容
     if st.session_state.current_page == "login":
@@ -1507,5 +1507,6 @@ if __name__ == "__main__":
         # 非法访问跳转登录
         go_to_login()
         st.rerun()
+
 
 
