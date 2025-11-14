@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import joblib
 import matplotlib  # 导入matplotlib核心库用于字体配置
 
-# ---------------------- 1. 基础配置（重点解决中文显示） ----------------------
+# ---------------------- 1. 基础配置 ----------------------
 # 全局字体设置，优先使用支持中文的字体，适配不同环境
 matplotlib.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC", "Arial Unicode MS", "Times New Roman"]
 matplotlib.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
@@ -88,13 +88,17 @@ body {
 """, unsafe_allow_html=True)
 
 
-# ---------------------- 3. 加载模型 & 定义特征范围 ----------------------
-# 加载XGBoost模型
+# ---------------------- 3. 加载模型、标准化器 & 定义特征范围 ----------------------
+# 加载模型和标准化器
 try:
     model = joblib.load('XGBoost.pkl')
-    st.success("XGBoost模型加载成功!")
-except FileNotFoundError:
-    st.error("模型文件未找到! 请确保'XGBoost.pkl'在当前目录下。")
+    scaler = joblib.load('data_scaler.pkl')  # 加载训练时保存的标准化器
+    st.success("XGBoost模型和标准化器加载成功!")
+except FileNotFoundError as e:
+    st.error(f"文件未找到: {str(e)}! 请确保模型文件和标准化器在当前目录下。")
+    st.stop()
+except Exception as e:
+    st.error(f"加载失败: {str(e)}")
     st.stop()
 
 # 定义四个输入特征的范围
@@ -105,10 +109,22 @@ feature_ranges = {
     '节数': {"type": "numerical", "min": 0.0, "max": 999999999.0, "default": 17.0, "step": 1.0}
 }
 
+# 特征名称映射（中文 -> 英文，用于SHAP图）
+feature_name_mapping = {
+    '拉力': 'Tensile Force',
+    '株高': 'Plant Height',
+    '叶柄长': 'Petiole Length',
+    '节数': 'Node Number',
+    '株高拉力比': 'Height-Force Ratio',
+    '叶柄节数比': 'Petiole-Node Ratio'
+}
+
 # 模型需要的6个特征名称（顺序必须与模型训练时一致）
 model_feature_names = ['拉力', '株高', '叶柄长', '节数', '株高拉力比', '叶柄节数比']
+# 对应的英文特征名（用于SHAP图）
+english_feature_names = [feature_name_mapping[name] for name in model_feature_names]
 
-# 倒伏级别说明（可根据实际情况调整）
+# 倒伏级别说明
 lodging_levels = {
     0: {"name": "无倒伏", "description": "作物直立生长，无明显倾斜现象，抗倒伏能力强"},
     1: {"name": "轻度倒伏", "description": "作物倾斜角度小于30°，对产量影响较小，抗倒伏能力较强"},
@@ -150,11 +166,11 @@ with st.container():
 if st.button("预测倒伏级别", type="primary", use_container_width=True, key="predict_btn"):
     # 计算衍生特征
     try:
-        if feature_values['拉力'] == 0:
-            st.error("拉力不能为0，请输入有效的拉力值！")
+        if feature_values['拉力'] <= 0:
+            st.error("拉力必须大于0，请输入有效的拉力值！")
             st.stop()
-        if feature_values['节数'] == 0:
-            st.error("节数不能为0，请输入有效的节数值！")
+        if feature_values['节数'] <= 0:
+            st.error("节数必须大于0，请输入有效的节数值！")
             st.stop()
             
         株高拉力比 = feature_values['株高'] / feature_values['拉力']
@@ -163,16 +179,22 @@ if st.button("预测倒伏级别", type="primary", use_container_width=True, key
         st.error(f"特征计算错误: {str(e)}")
         st.stop()
     
-    # 准备模型输入数据
-    model_input = [
-        feature_values['拉力'],
-        feature_values['株高'],
-        feature_values['叶柄长'],
-        feature_values['节数'],
-        株高拉力比,
-        叶柄节数比
-    ]
-    input_data = pd.DataFrame([model_input], columns=model_feature_names)
+    # 准备模型输入数据并标准化
+    try:
+        model_input = [
+            feature_values['拉力'],
+            feature_values['株高'],
+            feature_values['叶柄长'],
+            feature_values['节数'],
+            株高拉力比,
+            叶柄节数比
+        ]
+        # 标准化处理（与训练时保持一致）
+        input_scaled = scaler.transform([model_input])
+        input_data = pd.DataFrame(input_scaled, columns=model_feature_names)
+    except Exception as e:
+        st.error(f"数据标准化错误: {str(e)}")
+        st.stop()
     
     # 模型预测
     try:
@@ -184,10 +206,10 @@ if st.button("预测倒伏级别", type="primary", use_container_width=True, key
         st.error(f"模型预测错误: {str(e)}")
         st.stop()
 
-    # 计算SHAP值（强制字体配置）
+    # 计算SHAP值（使用英文特征名）
     try:
-        # 为SHAP单独设置字体，防止被内部配置覆盖
-        plt.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC", "Arial Unicode MS"]
+        # 为SHAP单独设置字体
+        plt.rcParams["font.family"] = ["Arial Unicode MS", "Times New Roman"]
         
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(input_data)
@@ -213,6 +235,7 @@ if st.button("预测倒伏级别", type="primary", use_container_width=True, key
         "confidence": confidence,  # 预测置信度
         "single_shap": single_shap,
         "feature_names": model_feature_names,
+        "english_feature_names": english_feature_names,  # 英文特征名
         "feature_values": model_input,
         "base_value": base_value,
         "input_features": feature_values,
@@ -240,7 +263,7 @@ if "pred_results" in st.session_state:
     # 显示预测结果（带置信度）
     st.markdown("### 倒伏级别预测结果")
     
-    # 获取级别信息，默认为未知级别
+    # 获取级别信息
     level_info = lodging_levels.get(pred_class, {"name": f"级别{pred_class}", "description": "无详细说明"})
     
     # 定义级别颜色
@@ -282,49 +305,42 @@ if "pred_results" in st.session_state:
     prob_df = prob_df.sort_values("概率值", ascending=False).drop("概率值", axis=1)
     st.dataframe(prob_df, use_container_width=True)
 
-    # 显示SHAP瀑布图（强制字体配置）
+    # 显示SHAP瀑布图（使用英文特征名）
     if res["single_shap"] is not None and res["base_value"] is not None:
-        st.markdown("### SHAP特征贡献图")
-        st.markdown("蓝色 = 降低倒伏风险，红色 = 增加倒伏风险，长度 = 贡献程度（前10个特征）")
+        st.markdown("### SHAP特征贡献图 (Feature Contribution)")
+        st.markdown("Blue = Reduce lodging risk, Red = Increase lodging risk, Length = Contribution degree (Top 10 features)")
         
-        # 再次强制设置字体，确保绘图时生效
-        plt.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC", "Arial Unicode MS"]
-        
+        # 使用英文特征名构建SHAP解释器
         shap_exp = shap.Explanation(
             values=res['single_shap'],
             base_values=res['base_value'],
             data=res['feature_values'],
-            feature_names=res['feature_names']
+            feature_names=res['english_feature_names']  # 关键：使用英文特征名
         )
 
         plt.figure(figsize=(12, 8))
         shap.plots.waterfall(shap_exp, max_display=10, show=False)
         
-        # 单独设置坐标轴和标签字体（关键：防止SHAP内部覆盖）
+        # 设置坐标轴和标签字体为英文
         for ax in plt.gcf().axes:
-            # 设置标题字体
-            ax.set_title(ax.get_title(), fontproperties="SimHei", fontsize=12)
-            # 设置坐标轴标签字体
-            ax.set_xlabel(ax.get_xlabel(), fontproperties="SimHei", fontsize=10)
-            ax.set_ylabel(ax.get_ylabel(), fontproperties="SimHei", fontsize=10)
-            # 设置刻度标签字体
+            ax.set_title(ax.get_title(), fontfamily="Times New Roman", fontsize=12)
+            ax.set_xlabel(ax.get_xlabel(), fontfamily="Times New Roman", fontsize=10)
+            ax.set_ylabel(ax.get_ylabel(), fontfamily="Times New Roman", fontsize=10)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
-                label.set_fontproperties("SimHei")
+                label.set_fontfamily("Times New Roman")
                 label.set_fontsize(9)
         
         plt.tight_layout()
         st.pyplot(plt.gcf())
 
-        # 显示所有特征的SHAP贡献值
-        if st.checkbox("显示所有特征的SHAP值", key="show_shap"):
+        # 显示所有特征的SHAP贡献值（中英文对照）
+        if st.checkbox("显示所有特征的SHAP值 (Show all SHAP values)", key="show_shap"):
+            # 创建中英文对照的SHAP值表格
             shap_df = pd.DataFrame({
-                "特征": res['feature_names'],
-                "数值": res['feature_values'],
-                "SHAP值（贡献度）": res['single_shap'].round(4)
+                "特征 (Feature)": [f"{cn} ({en})" for cn, en in zip(res['feature_names'], res['english_feature_names'])],
+                "数值 (Value)": [round(v, 4) for v in res['feature_values']],
+                "SHAP值 (贡献度)": res['single_shap'].round(4)
             })
-            shap_df["绝对贡献度"] = shap_df["SHAP值（贡献度）"].abs()
-            shap_df_sorted = shap_df.sort_values("绝对贡献度", ascending=False).drop("绝对贡献度", axis=1)
+            shap_df["绝对贡献度 (Absolute Contribution)"] = shap_df["SHAP值 (贡献度)"].abs()
+            shap_df_sorted = shap_df.sort_values("绝对贡献度 (Absolute Contribution)", ascending=False).drop("绝对贡献度 (Absolute Contribution)", axis=1)
             st.dataframe(shap_df_sorted, use_container_width=True)
-
-
-
