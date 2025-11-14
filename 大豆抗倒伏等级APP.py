@@ -308,7 +308,7 @@ if "pred_results" in st.session_state:
     # 显示SHAP瀑布图（使用英文特征名）
     if res["single_shap"] is not None and res["base_value"] is not None:
         st.markdown("### SHAP特征贡献图 (Feature Contribution)")
-        st.markdown("Blue = Reduce lodging risk, Red = Increase lodging risk, Length = Contribution degree (Top 10 features)")
+        st.markdown("蓝色 = 降低倒伏风险，红色 = 增加倒伏风险，长度 = 贡献程度")
         
         # 使用英文特征名构建SHAP解释器
         shap_exp = shap.Explanation(
@@ -344,5 +344,6 @@ if "pred_results" in st.session_state:
             shap_df["绝对贡献度 (Absolute Contribution)"] = shap_df["SHAP值 (贡献度)"].abs()
             shap_df_sorted = shap_df.sort_values("绝对贡献度 (Absolute Contribution)", ascending=False).drop("绝对贡献度 (Absolute Contribution)", axis=1)
             st.dataframe(shap_df_sorted, use_container_width=True)
+
 
 
