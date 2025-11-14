@@ -99,10 +99,10 @@ except FileNotFoundError:
 
 # 定义四个输入特征的范围
 feature_ranges = {
-    '拉力': {"type": "numerical", "min": 0.0, "max": 100.0, "default": 18.8, "step": 0.1},
-    '株高': {"type": "numerical", "min": 50.0, "max": 200.0, "default": 108.0, "step": 1.0},
-    '叶柄长': {"type": "numerical", "min": 5.0, "max": 50.0, "default": 17.0, "step": 0.1},
-    '节数': {"type": "numerical", "min": 5.0, "max": 50.0, "default": 17.0, "step": 1.0}
+    '拉力': {"type": "numerical", "min": 0.0, "max": 2000.0, "default": 18.8, "step": 0.1},
+    '株高': {"type": "numerical", "min": 0.0, "max": 2000.0, "default": 108.0, "step": 1.0},
+    '叶柄长': {"type": "numerical", "min": 0.0, "max": 2000.0, "default": 17.0, "step": 0.1},
+    '节数': {"type": "numerical", "min": 0.0, "max": 2000.0, "default": 17.0, "step": 1.0}
 }
 
 # 模型需要的6个特征名称（顺序必须与模型训练时一致）
@@ -325,3 +325,4 @@ if "pred_results" in st.session_state:
             shap_df["绝对贡献度"] = shap_df["SHAP值（贡献度）"].abs()
             shap_df_sorted = shap_df.sort_values("绝对贡献度", ascending=False).drop("绝对贡献度", axis=1)
             st.dataframe(shap_df_sorted, use_container_width=True)
+
